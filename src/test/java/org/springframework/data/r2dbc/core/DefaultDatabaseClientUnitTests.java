@@ -496,7 +496,7 @@ public class DefaultDatabaseClientUnitTests {
 				.as(StepVerifier::create) //
 				.expectNextCount(1).verifyComplete();
 
-		verify(statement, never()).execute();
+		verifyNoInteractions(statement);
 	}
 
 	@Test // gh-189
@@ -528,6 +528,7 @@ public class DefaultDatabaseClientUnitTests {
 		inOrder.verify(statement).returnGeneratedValues("foo");
 		inOrder.verify(statement).returnGeneratedValues("bar");
 		inOrder.verify(statement).execute();
+		inOrder.verifyNoMoreInteractions();
 	}
 
 	@Test // gh-189
@@ -555,7 +556,10 @@ public class DefaultDatabaseClientUnitTests {
 				.as(StepVerifier::create) //
 				.verifyComplete();
 
-		verify(statement).returnGeneratedValues("foo");
+		InOrder inOrder = inOrder(statement);
+		inOrder.verify(statement).returnGeneratedValues("foo");
+		inOrder.verify(statement).execute();
+		inOrder.verifyNoMoreInteractions();
 	}
 
 	@Test // gh-189
@@ -587,6 +591,7 @@ public class DefaultDatabaseClientUnitTests {
 		inOrder.verify(statement).returnGeneratedValues("foo");
 		inOrder.verify(statement).returnGeneratedValues("bar");
 		inOrder.verify(statement).execute();
+		inOrder.verifyNoMoreInteractions();
 	}
 
 	static class Person {
