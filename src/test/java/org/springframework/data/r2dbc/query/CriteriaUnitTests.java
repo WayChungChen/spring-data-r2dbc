@@ -20,8 +20,8 @@ import static org.springframework.data.r2dbc.query.Criteria.*;
 
 import java.util.Arrays;
 
+import org.assertj.core.api.SoftAssertions;
 import org.junit.Test;
-
 import org.springframework.data.r2dbc.query.Criteria.*;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 
@@ -31,6 +31,50 @@ import org.springframework.data.relational.core.sql.SqlIdentifier;
  * @author Mark Paluch
  */
 public class CriteriaUnitTests {
+
+	@Test // gh-289
+	public void fromCriteria() {
+
+		Criteria nested1 = where("foo").isNotNull();
+		Criteria nested2 = where("foo").isNull();
+		Criteria criteria = Criteria.from(nested1, nested2);
+
+		assertThat(criteria.isGroup()).isTrue();
+		assertThat(criteria.getGroup()).containsExactly(nested1, nested2);
+		assertThat(criteria.getPrevious()).isEqualTo(Criteria.empty());
+	}
+
+	@Test // gh-289
+	public void fromCriteriaOptimized() {
+
+		Criteria nested = where("foo").is("bar").and("baz").isNotNull();
+		Criteria criteria = Criteria.from(nested);
+
+		assertThat(criteria).isSameAs(nested);
+	}
+
+	@Test // gh-289
+	public void isEmpty() {
+
+		SoftAssertions.assertSoftly(softly -> {
+
+			Criteria empty = empty();
+			Criteria notEmpty = where("foo").is("bar");
+
+			assertThat(empty.isEmpty()).isTrue();
+			assertThat(notEmpty.isEmpty()).isFalse();
+
+			assertThat(Criteria.from(notEmpty).isEmpty()).isFalse();
+			assertThat(Criteria.from(notEmpty, notEmpty).isEmpty()).isFalse();
+
+			assertThat(Criteria.from(empty).isEmpty()).isTrue();
+			assertThat(Criteria.from(empty, empty).isEmpty()).isTrue();
+
+			assertThat(Criteria.from(empty, notEmpty).isEmpty()).isFalse();
+			assertThat(Criteria.from(notEmpty, empty).isEmpty()).isFalse();
+
+		});
+	}
 
 	@Test // gh-64
 	public void andChainedCriteria() {
@@ -50,6 +94,24 @@ public class CriteriaUnitTests {
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
+	@Test // gh-289
+	public void andGroupedCriteria() {
+
+		Criteria criteria = where("foo").is("bar").and(where("foo").is("baz"));
+
+		assertThat(criteria.isGroup()).isTrue();
+		assertThat(criteria.getGroup()).hasSize(1);
+		assertThat(criteria.getGroup().get(0).getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getCombinator()).isEqualTo(Combinator.AND);
+
+		criteria = criteria.getPrevious();
+
+		assertThat(criteria).isNotNull();
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getValue()).isEqualTo("bar");
+	}
+
 	@Test // gh-64
 	public void orChainedCriteria() {
 
@@ -60,7 +122,26 @@ public class CriteriaUnitTests {
 
 		criteria = criteria.getPrevious();
 
+		assertThat(criteria).isNotNull();
 		assertThat(criteria.getPrevious()).isNull();
+		assertThat(criteria.getValue()).isEqualTo("bar");
+	}
+
+	@Test // gh-289
+	public void orGroupedCriteria() {
+
+		Criteria criteria = where("foo").is("bar").or(where("foo").is("baz"));
+
+		assertThat(criteria.isGroup()).isTrue();
+		assertThat(criteria.getGroup()).hasSize(1);
+		assertThat(criteria.getGroup().get(0).getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getCombinator()).isEqualTo(Combinator.OR);
+
+		criteria = criteria.getPrevious();
+
+		assertThat(criteria).isNotNull();
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 

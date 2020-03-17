@@ -19,8 +19,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.data.domain.Sort.Order.*;
 
-import org.junit.Test;
+import java.util.Collections;
 
+import org.junit.Test;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.convert.MappingR2dbcConverter;
 import org.springframework.data.r2dbc.convert.R2dbcConverter;
@@ -41,9 +42,86 @@ import org.springframework.data.relational.core.sql.Table;
  */
 public class QueryMapperUnitTests {
 
-	R2dbcConverter converter = new MappingR2dbcConverter(new R2dbcMappingContext());
+	R2dbcMappingContext context = new R2dbcMappingContext();
+	R2dbcConverter converter = new MappingR2dbcConverter(context);
+
 	QueryMapper mapper = new QueryMapper(PostgresDialect.INSTANCE, converter);
 	BindTarget bindTarget = mock(BindTarget.class);
+
+	@Test // gh-289
+	public void shouldNotMapEmptyCriteria() {
+
+		Criteria criteria = Criteria.empty();
+
+		assertThatIllegalArgumentException().isThrownBy(() -> map(criteria));
+	}
+
+	@Test // gh-289
+	public void shouldNotMapEmptyAndCriteria() {
+
+		Criteria criteria = Criteria.empty().and(Collections.emptyList());
+
+		assertThatIllegalArgumentException().isThrownBy(() -> map(criteria));
+	}
+
+	@Test // gh-289
+	public void shouldNotMapEmptyNestedCriteria() {
+
+		Criteria criteria = Criteria.empty().and(Collections.emptyList()).and(Criteria.empty().and(Criteria.empty()));
+
+		assertThat(criteria.isEmpty()).isTrue();
+		assertThatIllegalArgumentException().isThrownBy(() -> map(criteria));
+	}
+
+	@Test // gh-289
+	public void shouldMapSomeNestedCriteria() {
+
+		Criteria criteria = Criteria.empty().and(Collections.emptyList())
+				.and(Criteria.empty().and(Criteria.where("name").is("Hank")));
+
+		assertThat(criteria.isEmpty()).isFalse();
+
+		BoundCondition bindings = map(criteria);
+
+		assertThat(bindings.getCondition().toString()).isEqualTo("((person.name = ?[$1]))");
+	}
+
+	@Test // gh-289
+	public void shouldMapNestedGroup() {
+
+		Criteria initial = Criteria.empty();
+
+		Criteria criteria = initial.and(Criteria.where("name").is("Foo")) //
+				.and(Criteria.where("name").is("Bar") //
+						.or("age").lessThan(49) //
+						.or(Criteria.where("name").not("Bar") //
+								.and("age").greaterThan(49) //
+						) //
+				);
+
+		assertThat(criteria.isEmpty()).isFalse();
+
+		BoundCondition bindings = map(criteria);
+
+		assertThat(bindings.getCondition().toString()).isEqualTo(
+				"(person.name = ?[$1]) AND (person.name = ?[$2] OR person.age < ?[$3] OR (person.name != ?[$4] AND person.age > ?[$5]))");
+	}
+
+	@Test // gh-289
+	public void shouldMapFrom() {
+
+		Criteria criteria = Criteria.from(Criteria.where("name").is("Foo")) //
+				.and(Criteria.where("name").is("Bar") //
+						.or("age").lessThan(49) //
+				);
+
+		assertThat(criteria.isEmpty()).isFalse();
+
+		BoundCondition bindings = map(criteria);
+
+		assertThat(bindings.getCondition().toString())
+				.isEqualTo("person.name = ?[$1] AND (person.name = ?[$2] OR person.age < ?[$3])");
+	}
 
 	@Test // gh-64
 	public void shouldMapSimpleCriteria() {
@@ -79,7 +157,7 @@ public class QueryMapperUnitTests {
 		Table table = Table.create("my_table").as("my_aliased_table");
 
 		Expression mappedObject = mapper.getMappedObject(table.column("alternative").as("my_aliased_col"),
-				converter.getMappingContext().getRequiredPersistentEntity(Person.class));
+				context.getRequiredPersistentEntity(Person.class));
 
 		assertThat(mappedObject).hasToString("my_aliased_table.another_name AS my_aliased_col");
 	}
@@ -90,7 +168,7 @@ public class QueryMapperUnitTests {
 		Table table = Table.create("my_table").as("my_aliased_table");
 
 		Expression mappedObject = mapper.getMappedObject(Functions.count(table.column("alternative")),
-				converter.getMappingContext().getRequiredPersistentEntity(Person.class));
+				context.getRequiredPersistentEntity(Person.class));
 
 		assertThat(mappedObject).hasToString("COUNT(my_aliased_table.another_name)");
 	}
@@ -101,7 +179,7 @@ public class QueryMapperUnitTests {
 		Table table = Table.create("my_table").as("my_aliased_table");
 
 		Expression mappedObject = mapper.getMappedObject(table.column("unknown").as("my_aliased_col"),
-				converter.getMappingContext().getRequiredPersistentEntity(Person.class));
+				context.getRequiredPersistentEntity(Person.class));
 
 		assertThat(mappedObject).hasToString("my_aliased_table.unknown AS my_aliased_col");
 	}
@@ -282,7 +360,7 @@ public class QueryMapperUnitTests {
 
 		Sort sort = Sort.by(desc("alternative"));
 
-		Sort mapped = mapper.getMappedObject(sort, converter.getMappingContext().getRequiredPersistentEntity(Person.class));
+		Sort mapped = mapper.getMappedObject(sort, context.getRequiredPersistentEntity(Person.class));
 
 		assertThat(mapped.getOrderFor("another_name")).isEqualTo(desc("another_name"));
 		assertThat(mapped.getOrderFor("alternative")).isNull();
@@ -293,7 +371,7 @@ public class QueryMapperUnitTests {
 		BindMarkersFactory markers = BindMarkersFactory.indexed("$", 1);
 
 		return mapper.getMappedObject(markers.create(), criteria, Table.create("person"),
-				converter.getMappingContext().getRequiredPersistentEntity(Person.class));
+				context.getRequiredPersistentEntity(Person.class));
 	}
 
 	static class Person {

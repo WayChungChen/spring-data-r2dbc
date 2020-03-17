@@ -185,7 +185,7 @@ public interface StatementMapper {
 		private final Table table;
 		private final List<String> projectedFields;
 		private final List<Expression> selectList;
-		private final @Nullable Criteria criteria;
+		private final Criteria criteria;
 		private final Sort sort;
 		private final long offset;
 		private final int limit;
@@ -219,8 +219,11 @@ public interface StatementMapper {
 		 * @since 1.1
 		 */
 		public static SelectSpec create(SqlIdentifier table) {
-			return new SelectSpec(Table.create(table), Collections.emptyList(), Collections.emptyList(), null,
-					Sort.unsorted(), -1, -1);
+
+			List<String> projectedFields = Collections.emptyList();
+			List<Expression> selectList = Collections.emptyList();
+			return new SelectSpec(Table.create(table), projectedFields, selectList, Criteria.empty(), Sort.unsorted(), -1,
+					-1);
 		}
 
 		public SelectSpec doWithTable(BiFunction<Table, SelectSpec, SelectSpec> function) {
@@ -367,7 +370,6 @@ public interface StatementMapper {
 			return Collections.unmodifiableList(selectList);
 		}
 
-		@Nullable
 		public Criteria getCriteria() {
 			return this.criteria;
 		}
@@ -460,12 +462,11 @@ public interface StatementMapper {
 	class UpdateSpec {
 
 		private final SqlIdentifier table;
-		@Nullable
-		private final Update update;
+		@Nullable private final Update update;
 
-		private final @Nullable Criteria criteria;
+		private final Criteria criteria;
 
-		protected UpdateSpec(SqlIdentifier table, @Nullable Update update, @Nullable Criteria criteria) {
+		protected UpdateSpec(SqlIdentifier table, @Nullable Update update, Criteria criteria) {
 
 			this.table = table;
 			this.update = update;
@@ -490,7 +491,7 @@ public interface StatementMapper {
 		 * @since 1.1
 		 */
 		public static UpdateSpec create(SqlIdentifier table, Update update) {
-			return new UpdateSpec(table, update, null);
+			return new UpdateSpec(table, update, Criteria.empty());
 		}
 
 		/**
@@ -512,7 +513,6 @@ public interface StatementMapper {
 			return this.update;
 		}
 
-		@Nullable
 		public Criteria getCriteria() {
 			return this.criteria;
 		}
@@ -525,9 +525,9 @@ public interface StatementMapper {
 
 		private final SqlIdentifier table;
 
-		private final @Nullable Criteria criteria;
+		private final Criteria criteria;
 
-		protected DeleteSpec(SqlIdentifier table, @Nullable Criteria criteria) {
+		protected DeleteSpec(SqlIdentifier table, Criteria criteria) {
 			this.table = table;
 			this.criteria = criteria;
 		}
@@ -550,7 +550,7 @@ public interface StatementMapper {
 		 * @since 1.1
 		 */
 		public static DeleteSpec create(SqlIdentifier table) {
-			return new DeleteSpec(table, null);
+			return new DeleteSpec(table, Criteria.empty());
 		}
 
 		/**
@@ -567,7 +567,6 @@ public interface StatementMapper {
 			return this.table;
 		}
 
-		@Nullable
 		public Criteria getCriteria() {
 			return this.criteria;
 		}
