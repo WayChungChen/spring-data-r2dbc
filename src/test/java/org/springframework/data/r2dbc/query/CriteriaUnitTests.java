@@ -22,7 +22,7 @@ import java.util.Arrays;
 
 import org.assertj.core.api.SoftAssertions;
 import org.junit.Test;
-import org.springframework.data.r2dbc.query.Criteria.*;
+
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 
 /**
@@ -72,7 +72,6 @@ public class CriteriaUnitTests {
 
 			assertThat(Criteria.from(empty, notEmpty).isEmpty()).isFalse();
 			assertThat(Criteria.from(notEmpty, empty).isEmpty()).isFalse();
-
 		});
 	}
 
@@ -155,6 +154,16 @@ public class CriteriaUnitTests {
 		assertThat(criteria.getValue()).isEqualTo("bar");
 	}
 
+	@Test
+	public void shouldBuildEqualsIgnoreCaseCriteria() {
+		Criteria criteria = where("foo").is("bar").ignoreCase(true);
+
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.EQ);
+		assertThat(criteria.getValue()).isEqualTo("bar");
+		assertThat(criteria.isIgnoreCase()).isTrue();
+	}
+
 	@Test // gh-64
 	public void shouldBuildNotEqualsCriteria() {
 
@@ -235,6 +244,15 @@ public class CriteriaUnitTests {
 		assertThat(criteria.getValue()).isEqualTo("hello%");
 	}
 
+	@Test
+	public void shouldBuildNotLikeCriteria() {
+		Criteria criteria = where("foo").notLike("hello%");
+
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.NOT_LIKE);
+		assertThat(criteria.getValue()).isEqualTo("hello%");
+	}
+
 	@Test // gh-64
 	public void shouldBuildIsNullCriteria() {
 
@@ -251,5 +269,23 @@ public class CriteriaUnitTests {
 
 		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
 		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_NOT_NULL);
+	}
+
+	@Test // gh-282
+	public void shouldBuildIsTrueCriteria() {
+
+		Criteria criteria = where("foo").isTrue();
+
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_TRUE);
+	}
+
+	@Test // gh-282
+	public void shouldBuildIsFalseCriteria() {
+
+		Criteria criteria = where("foo").isFalse();
+
+		assertThat(criteria.getColumn()).isEqualTo(SqlIdentifier.unquoted("foo"));
+		assertThat(criteria.getComparator()).isEqualTo(Comparator.IS_FALSE);
 	}
 }

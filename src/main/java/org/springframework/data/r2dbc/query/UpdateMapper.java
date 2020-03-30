@@ -26,7 +26,9 @@ import org.springframework.data.r2dbc.dialect.Bindings;
 import org.springframework.data.r2dbc.dialect.MutableBindings;
 import org.springframework.data.r2dbc.dialect.R2dbcDialect;
 import org.springframework.data.r2dbc.mapping.SettableValue;
+import org.springframework.data.relational.core.dialect.Escaper;
 import org.springframework.data.relational.core.mapping.RelationalPersistentEntity;
+import org.springframework.data.relational.core.query.ValueFunction;
 import org.springframework.data.relational.core.sql.AssignValue;
 import org.springframework.data.relational.core.sql.Assignment;
 import org.springframework.data.relational.core.sql.Assignments;
@@ -63,8 +65,29 @@ public class UpdateMapper extends QueryMapper {
 	 * @param table must not be {@literal null}.
 	 * @param entity related {@link RelationalPersistentEntity}, can be {@literal null}.
 	 * @return the mapped {@link BoundAssignments}.
+	 * @deprecated since 1.1, use
+	 *             {@link #getMappedObject(BindMarkers, org.springframework.data.relational.core.query.Update, Table, RelationalPersistentEntity)}
+	 *             instead.
 	 */
+	@Deprecated
 	public BoundAssignments getMappedObject(BindMarkers markers, Update update, Table table,
+			@Nullable RelationalPersistentEntity<?> entity) {
+		return getMappedObject(markers, update.getAssignments(), table, entity);
+	}
+
+	/**
+	 * Map a {@link org.springframework.data.relational.core.query.Update} object to {@link BoundAssignments} and consider
+	 * value/{@code NULL} {@link Bindings}.
+	 *
+	 * @param markers bind markers object, must not be {@literal null}.
+	 * @param update update definition to map, must not be {@literal null}.
+	 * @param table must not be {@literal null}.
+	 * @param entity related {@link RelationalPersistentEntity}, can be {@literal null}.
+	 * @return the mapped {@link BoundAssignments}.
+	 * @since 1.1
+	 */
+	public BoundAssignments getMappedObject(BindMarkers markers,
+			org.springframework.data.relational.core.query.Update update, Table table,
 			@Nullable RelationalPersistentEntity<?> entity) {
 		return getMappedObject(markers, update.getAssignments(), table, entity);
 	}
@@ -113,6 +136,17 @@ public class UpdateMapper extends QueryMapper {
 			mappedValue = convertValue(settableValue.getValue(), propertyField.getTypeHint());
 			typeHint = getTypeHint(mappedValue, actualType.getType(), settableValue);
 
+		} else if (value instanceof ValueFunction) {
+
+			ValueFunction<Object> valueFunction = (ValueFunction<Object>) value;
+
+			mappedValue = convertValue(valueFunction.apply(Escaper.DEFAULT), propertyField.getTypeHint());
+
+			if (mappedValue == null) {
+				return Assignments.value(column, SQL.nullLiteral());
+			}
+
+			typeHint = actualType.getType();
 		} else {
 
 			mappedValue = convertValue(value, propertyField.getTypeHint());

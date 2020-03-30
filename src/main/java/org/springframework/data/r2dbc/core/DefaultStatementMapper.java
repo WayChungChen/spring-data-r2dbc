@@ -39,6 +39,7 @@ import org.springframework.util.Assert;
  * Default {@link StatementMapper} implementation.
  *
  * @author Mark Paluch
+ * @author Roman Chigvintsev
  */
 class DefaultStatementMapper implements StatementMapper {
 
@@ -226,6 +227,15 @@ class DefaultStatementMapper implements StatementMapper {
 		return getMappedObject(deleteSpec, null);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.r2dbc.function.StatementMapper#getRenderContext()
+	 */
+	@Override
+	public RenderContext getRenderContext() {
+		return renderContext;
+	}
+
 	private PreparedOperation<Delete> getMappedObject(DeleteSpec deleteSpec,
 			@Nullable RelationalPersistentEntity<?> entity) {
 
@@ -374,6 +384,15 @@ class DefaultStatementMapper implements StatementMapper {
 		@Override
 		public PreparedOperation<?> getMappedObject(DeleteSpec deleteSpec) {
 			return DefaultStatementMapper.this.getMappedObject(deleteSpec, this.entity);
+		}
+
+		/*
+		 * (non-Javadoc)
+		 * @see org.springframework.data.r2dbc.function.StatementMapper#getRenderContext()
+		 */
+		@Override
+		public RenderContext getRenderContext() {
+			return DefaultStatementMapper.this.getRenderContext();
 		}
 	}
 }

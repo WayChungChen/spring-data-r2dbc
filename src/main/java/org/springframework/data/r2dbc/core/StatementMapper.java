@@ -30,10 +30,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.dialect.BindMarkers;
 import org.springframework.data.r2dbc.mapping.SettableValue;
 import org.springframework.data.r2dbc.query.Criteria;
-import org.springframework.data.r2dbc.query.Update;
+import org.springframework.data.relational.core.query.CriteriaDefinition;
 import org.springframework.data.relational.core.sql.Expression;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 import org.springframework.data.relational.core.sql.Table;
+import org.springframework.data.relational.core.sql.render.RenderContext;
 import org.springframework.lang.Nullable;
 
 /**
@@ -42,6 +43,7 @@ import org.springframework.lang.Nullable;
  * and vendor-specific SQL differences.
  *
  * @author Mark Paluch
+ * @author Roman Chigvintsev
  */
 public interface StatementMapper {
 
@@ -141,7 +143,7 @@ public interface StatementMapper {
 	 * @param table
 	 * @return the {@link UpdateSpec}.
 	 */
-	default UpdateSpec createUpdate(String table, Update update) {
+	default UpdateSpec createUpdate(String table, org.springframework.data.relational.core.query.Update update) {
 		return UpdateSpec.create(table, update);
 	}
 
@@ -152,7 +154,7 @@ public interface StatementMapper {
 	 * @return the {@link UpdateSpec}.
 	 * @since 1.1
 	 */
-	default UpdateSpec createUpdate(SqlIdentifier table, Update update) {
+	default UpdateSpec createUpdate(SqlIdentifier table, org.springframework.data.relational.core.query.Update update) {
 		return UpdateSpec.create(table, update);
 	}
 
@@ -178,6 +180,16 @@ public interface StatementMapper {
 	}
 
 	/**
+	 * Returns {@link RenderContext}.
+	 *
+	 * @return {@link RenderContext} instance or {@literal null} if {@link RenderContext} is not available
+	 */
+	@Nullable
+	default RenderContext getRenderContext() {
+		return null;
+	}
+
+	/**
 	 * {@code SELECT} specification.
 	 */
 	class SelectSpec {
@@ -185,13 +197,13 @@ public interface StatementMapper {
 		private final Table table;
 		private final List<String> projectedFields;
 		private final List<Expression> selectList;
-		private final Criteria criteria;
+		private final CriteriaDefinition criteria;
 		private final Sort sort;
 		private final long offset;
 		private final int limit;
 
 		protected SelectSpec(Table table, List<String> projectedFields, List<Expression> selectList,
-				@Nullable Criteria criteria, Sort sort, int limit, long offset) {
+				@Nullable CriteriaDefinition criteria, Sort sort, int limit, long offset) {
 			this.table = table;
 			this.projectedFields = projectedFields;
 			this.selectList = selectList;
@@ -289,7 +301,7 @@ public interface StatementMapper {
 		 * @param criteria
 		 * @return the {@link SelectSpec}.
 		 */
-		public SelectSpec withCriteria(Criteria criteria) {
+		public SelectSpec withCriteria(CriteriaDefinition criteria) {
 			return new SelectSpec(this.table, this.projectedFields, this.selectList, criteria, this.sort, this.limit,
 					this.offset);
 		}
@@ -370,7 +382,7 @@ public interface StatementMapper {
 			return Collections.unmodifiableList(selectList);
 		}
 
-		public Criteria getCriteria() {
+		public CriteriaDefinition getCriteria() {
 			return this.criteria;
 		}
 
@@ -462,11 +474,12 @@ public interface StatementMapper {
 	class UpdateSpec {
 
 		private final SqlIdentifier table;
-		@Nullable private final Update update;
+		@Nullable private final org.springframework.data.relational.core.query.Update update;
 
-		private final Criteria criteria;
+		private final CriteriaDefinition criteria;
 
-		protected UpdateSpec(SqlIdentifier table, @Nullable Update update, Criteria criteria) {
+		protected UpdateSpec(SqlIdentifier table, @Nullable org.springframework.data.relational.core.query.Update update,
+				CriteriaDefinition criteria) {
 
 			this.table = table;
 			this.update = update;
@@ -479,7 +492,7 @@ public interface StatementMapper {
 		 * @param table
 		 * @return the {@link InsertSpec}.
 		 */
-		public static UpdateSpec create(String table, Update update) {
+		public static UpdateSpec create(String table, org.springframework.data.relational.core.query.Update update) {
 			return create(SqlIdentifier.unquoted(table), update);
 		}
 
@@ -490,7 +503,7 @@ public interface StatementMapper {
 		 * @return the {@link InsertSpec}.
 		 * @since 1.1
 		 */
-		public static UpdateSpec create(SqlIdentifier table, Update update) {
+		public static UpdateSpec create(SqlIdentifier table, org.springframework.data.relational.core.query.Update update) {
 			return new UpdateSpec(table, update, Criteria.empty());
 		}
 
@@ -500,7 +513,7 @@ public interface StatementMapper {
 		 * @param criteria
 		 * @return the {@link UpdateSpec}.
 		 */
-		public UpdateSpec withCriteria(Criteria criteria) {
+		public UpdateSpec withCriteria(CriteriaDefinition criteria) {
 			return new UpdateSpec(this.table, this.update, criteria);
 		}
 
@@ -509,11 +522,11 @@ public interface StatementMapper {
 		}
 
 		@Nullable
-		public Update getUpdate() {
+		public org.springframework.data.relational.core.query.Update getUpdate() {
 			return this.update;
 		}
 
-		public Criteria getCriteria() {
+		public CriteriaDefinition getCriteria() {
 			return this.criteria;
 		}
 	}
@@ -525,9 +538,9 @@ public interface StatementMapper {
 
 		private final SqlIdentifier table;
 
-		private final Criteria criteria;
+		private final CriteriaDefinition criteria;
 
-		protected DeleteSpec(SqlIdentifier table, Criteria criteria) {
+		protected DeleteSpec(SqlIdentifier table, CriteriaDefinition criteria) {
 			this.table = table;
 			this.criteria = criteria;
 		}
@@ -559,7 +572,7 @@ public interface StatementMapper {
 		 * @param criteria
 		 * @return the {@link DeleteSpec}.
 		 */
-		public DeleteSpec withCriteria(Criteria criteria) {
+		public DeleteSpec withCriteria(CriteriaDefinition criteria) {
 			return new DeleteSpec(this.table, criteria);
 		}
 
@@ -567,7 +580,7 @@ public interface StatementMapper {
 			return this.table;
 		}
 
-		public Criteria getCriteria() {
+		public CriteriaDefinition getCriteria() {
 			return this.criteria;
 		}
 	}

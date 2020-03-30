@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.springframework.dao.InvalidDataAccessApiUsageException;
+import org.springframework.data.relational.core.query.CriteriaDefinition;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -45,8 +46,10 @@ import org.springframework.util.Assert;
  *
  * @author Mark Paluch
  * @author Oliver Drotbohm
+ * @deprecated since 1.1, use {@link org.springframework.data.relational.core.query.Criteria} instead.
  */
-public class Criteria {
+@Deprecated
+public class Criteria implements CriteriaDefinition {
 
 	private static final Criteria EMPTY = new Criteria(SqlIdentifier.EMPTY, Comparator.INITIAL, null);
 
@@ -57,13 +60,19 @@ public class Criteria {
 	private final @Nullable SqlIdentifier column;
 	private final @Nullable Comparator comparator;
 	private final @Nullable Object value;
+	private final boolean ignoreCase;
 
 	private Criteria(SqlIdentifier column, Comparator comparator, @Nullable Object value) {
-		this(null, Combinator.INITIAL, Collections.emptyList(), column, comparator, value);
+		this(null, Combinator.INITIAL, Collections.emptyList(), column, comparator, value, false);
 	}
 
 	private Criteria(@Nullable Criteria previous, Combinator combinator, List<Criteria> group,
 			@Nullable SqlIdentifier column, @Nullable Comparator comparator, @Nullable Object value) {
+		this(previous, combinator, group, column, comparator, value, false);
+	}
+
+	private Criteria(@Nullable Criteria previous, Combinator combinator, List<Criteria> group,
+			@Nullable SqlIdentifier column, @Nullable Comparator comparator, @Nullable Object value, boolean ignoreCase) {
 
 		this.previous = previous;
 		this.combinator = previous != null && previous.isEmpty() ? Combinator.INITIAL : combinator;
@@ -71,6 +80,7 @@ public class Criteria {
 		this.column = column;
 		this.comparator = comparator;
 		this.value = value;
+		this.ignoreCase = ignoreCase;
 	}
 
 	private Criteria(@Nullable Criteria previous, Combinator combinator, List<Criteria> group) {
@@ -81,6 +91,7 @@ public class Criteria {
 		this.column = null;
 		this.comparator = null;
 		this.value = null;
+		this.ignoreCase = false;
 	}
 
 	/**
@@ -237,18 +248,31 @@ public class Criteria {
 	}
 
 	/**
+	 * Creates a new {@link Criteria} with the given "ignore case" flag.
+	 *
+	 * @param ignoreCase {@literal true} if comparison should be done in case-insensitive way
+	 * @return a new {@link Criteria} object
+	 */
+	public Criteria ignoreCase(boolean ignoreCase) {
+		if (this.ignoreCase != ignoreCase) {
+			return new Criteria(previous, combinator, group, column, comparator, value, ignoreCase);
+		}
+		return this;
+	}
+
+	/**
 	 * @return the previous {@link Criteria} object. Can be {@literal null} if there is no previous {@link Criteria}.
 	 * @see #hasPrevious()
 	 */
 	@Nullable
-	Criteria getPrevious() {
+	public Criteria getPrevious() {
 		return previous;
 	}
 
 	/**
 	 * @return {@literal true} if this {@link Criteria} has a previous one.
 	 */
-	boolean hasPrevious() {
+	public boolean hasPrevious() {
 		return previous != null;
 	}
 
@@ -299,18 +323,21 @@ public class Criteria {
 	/**
 	 * @return {@literal true} if this {@link Criteria} is empty.
 	 */
-	boolean isGroup() {
+	@Override
+	public boolean isGroup() {
 		return !this.group.isEmpty();
 	}
 
 	/**
 	 * @return {@link Combinator} to combine this criteria with a previous one.
 	 */
-	Combinator getCombinator() {
+	@Override
+	public Combinator getCombinator() {
 		return combinator;
 	}
 
-	List<Criteria> getGroup() {
+	@Override
+	public List<Criteria> getGroup() {
 		return group;
 	}
 
@@ -318,7 +345,8 @@ public class Criteria {
 	 * @return the column/property name.
 	 */
 	@Nullable
-	SqlIdentifier getColumn() {
+	@Override
+	public SqlIdentifier getColumn() {
 		return column;
 	}
 
@@ -326,7 +354,8 @@ public class Criteria {
 	 * @return {@link Comparator}.
 	 */
 	@Nullable
-	Comparator getComparator() {
+	@Override
+	public Comparator getComparator() {
 		return comparator;
 	}
 
@@ -334,16 +363,19 @@ public class Criteria {
 	 * @return the comparison value. Can be {@literal null}.
 	 */
 	@Nullable
-	Object getValue() {
+	@Override
+	public Object getValue() {
 		return value;
 	}
 
-	enum Comparator {
-		INITIAL, EQ, NEQ, LT, LTE, GT, GTE, IS_NULL, IS_NOT_NULL, LIKE, NOT_IN, IN,
-	}
-
-	enum Combinator {
-		INITIAL, AND, OR;
+	/**
+	 * Checks whether comparison should be done in case-insensitive way.
+	 *
+	 * @return {@literal true} if comparison should be done in case-insensitive way
+	 */
+	@Override
+	public boolean isIgnoreCase() {
+		return ignoreCase;
 	}
 
 	/**
@@ -429,6 +461,14 @@ public class Criteria {
 		Criteria like(Object value);
 
 		/**
+		 * Creates a {@link Criteria} using {@code NOT LIKE}.
+		 *
+		 * @param value must not be {@literal null}
+		 * @return a new {@link Criteria} object
+		 */
+		Criteria notLike(Object value);
+
+		/**
 		 * Creates a {@link Criteria} using {@code IS NULL}.
 		 */
 		Criteria isNull();
@@ -437,6 +477,20 @@ public class Criteria {
 		 * Creates a {@link Criteria} using {@code IS NOT NULL}.
 		 */
 		Criteria isNotNull();
+
+		/**
+		 * Creates a {@link Criteria} using {@code IS TRUE}.
+		 *
+		 * @return a new {@link Criteria} object
+		 */
+		Criteria isTrue();
+
+		/**
+		 * Creates a {@link Criteria} using {@code IS FALSE}.
+		 *
+		 * @return a new {@link Criteria} object
+		 */
+		Criteria isFalse();
 	}
 
 	/**
@@ -598,6 +652,16 @@ public class Criteria {
 
 		/*
 		 * (non-Javadoc)
+		 * @see org.springframework.data.r2dbc.function.query.Criteria.CriteriaStep#notLike(java.lang.Object)
+		 */
+		@Override
+		public Criteria notLike(Object value) {
+			Assert.notNull(value, "Value must not be null!");
+			return createCriteria(Comparator.NOT_LIKE, value);
+		}
+
+		/*
+		 * (non-Javadoc)
 		 * @see org.springframework.data.r2dbc.function.query.Criteria.CriteriaStep#isNull()
 		 */
 		@Override
@@ -612,6 +676,24 @@ public class Criteria {
 		@Override
 		public Criteria isNotNull() {
 			return createCriteria(Comparator.IS_NOT_NULL, null);
+		}
+
+		/*
+		 * (non-Javadoc)
+		 * @see org.springframework.data.r2dbc.function.query.Criteria.CriteriaStep#isTrue()
+		 */
+		@Override
+		public Criteria isTrue() {
+			return createCriteria(Comparator.IS_TRUE, null);
+		}
+
+		/*
+		 * (non-Javadoc)
+		 * @see org.springframework.data.r2dbc.function.query.Criteria.CriteriaStep#isFalse()
+		 */
+		@Override
+		public Criteria isFalse() {
+			return createCriteria(Comparator.IS_FALSE, null);
 		}
 
 		protected Criteria createCriteria(Comparator comparator, Object value) {

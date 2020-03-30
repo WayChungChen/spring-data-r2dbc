@@ -18,6 +18,7 @@ package org.springframework.data.r2dbc.core;
 import io.r2dbc.spi.ConnectionFactory;
 import io.r2dbc.spi.Row;
 import io.r2dbc.spi.RowMetadata;
+import io.r2dbc.spi.Statement;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
@@ -33,10 +34,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.r2dbc.mapping.SettableValue;
-import org.springframework.data.r2dbc.query.Criteria;
 import org.springframework.data.r2dbc.query.Update;
 import org.springframework.data.r2dbc.support.R2dbcExceptionTranslator;
+import org.springframework.data.relational.core.query.CriteriaDefinition;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
+import org.springframework.util.Assert;
 
 /**
  * A non-blocking, reactive client for performing database calls requests with Reactive Streams back pressure. Provides
@@ -143,6 +145,16 @@ public interface DatabaseClient {
 		Builder exceptionTranslator(R2dbcExceptionTranslator exceptionTranslator);
 
 		/**
+		 * Configures a {@link ExecuteFunction} to execute {@link Statement} objects.
+		 *
+		 * @param executeFunction must not be {@literal null}.
+		 * @return {@code this} {@link Builder}.
+		 * @since 1.1
+		 * @see Statement#execute()
+		 */
+		Builder executeFunction(ExecuteFunction executeFunction);
+
+		/**
 		 * Configures a {@link ReactiveDataAccessStrategy}.
 		 *
 		 * @param accessStrategy must not be {@literal null}.
@@ -186,7 +198,7 @@ public interface DatabaseClient {
 	/**
 	 * Contract for specifying a SQL call along with options leading to the exchange.
 	 */
-	interface GenericExecuteSpec extends BindSpec<GenericExecuteSpec> {
+	interface GenericExecuteSpec extends BindSpec<GenericExecuteSpec>, StatementFilterSpec<GenericExecuteSpec> {
 
 		/**
 		 * Define the target type the result should be mapped to. <br />
@@ -231,7 +243,7 @@ public interface DatabaseClient {
 	/**
 	 * Contract for specifying a SQL call along with options leading to the exchange.
 	 */
-	interface TypedExecuteSpec<T> extends BindSpec<TypedExecuteSpec<T>> {
+	interface TypedExecuteSpec<T> extends BindSpec<TypedExecuteSpec<T>>, StatementFilterSpec<TypedExecuteSpec<T>> {
 
 		/**
 		 * Define the target type the result should be mapped to. <br />
@@ -517,11 +529,11 @@ public interface DatabaseClient {
 		S project(SqlIdentifier... selectedFields);
 
 		/**
-		 * Configure a filter {@link Criteria}.
+		 * Configure a filter {@link CriteriaDefinition}.
 		 *
 		 * @param criteria must not be {@literal null}.
 		 */
-		S matching(Criteria criteria);
+		S matching(CriteriaDefinition criteria);
 
 		/**
 		 * Configure {@link Sort}.
@@ -693,8 +705,18 @@ public interface DatabaseClient {
 		 * Specify an {@link Update} object containing assignments.
 		 *
 		 * @param update must not be {@literal null}.
+		 * @deprecated since 1.1, use {@link #using(org.springframework.data.relational.core.query.Update)}.
 		 */
+		@Deprecated
 		UpdateMatchingSpec using(Update update);
+
+		/**
+		 * Specify an {@link Update} object containing assignments.
+		 *
+		 * @param update must not be {@literal null}.
+		 * @since 1.1
+		 */
+		UpdateMatchingSpec using(org.springframework.data.relational.core.query.Update update);
 	}
 
 	/**
@@ -738,11 +760,11 @@ public interface DatabaseClient {
 	interface UpdateMatchingSpec extends UpdateSpec {
 
 		/**
-		 * Configure a filter {@link Criteria}.
+		 * Configure a filter {@link CriteriaDefinition}.
 		 *
 		 * @param criteria must not be {@literal null}.
 		 */
-		UpdateSpec matching(Criteria criteria);
+		UpdateSpec matching(CriteriaDefinition criteria);
 	}
 
 	/**
@@ -789,11 +811,11 @@ public interface DatabaseClient {
 		TypedDeleteSpec<T> table(SqlIdentifier tableName);
 
 		/**
-		 * Configure a filter {@link Criteria}.
+		 * Configure a filter {@link CriteriaDefinition}.
 		 *
 		 * @param criteria must not be {@literal null}.
 		 */
-		DeleteSpec matching(Criteria criteria);
+		DeleteSpec matching(CriteriaDefinition criteria);
 	}
 
 	/**
@@ -802,11 +824,11 @@ public interface DatabaseClient {
 	interface DeleteMatchingSpec extends DeleteSpec {
 
 		/**
-		 * Configure a filter {@link Criteria}.
+		 * Configure a filter {@link CriteriaDefinition}.
 		 *
 		 * @param criteria must not be {@literal null}.
 		 */
-		DeleteSpec matching(Criteria criteria);
+		DeleteSpec matching(CriteriaDefinition criteria);
 	}
 
 	/**
@@ -865,5 +887,32 @@ public interface DatabaseClient {
 		 * @param type must not be {@literal null}.
 		 */
 		S bindNull(String name, Class<?> type);
+	}
+
+	/**
+	 * Contract for applying a {@link StatementFilterFunction}.
+	 *
+	 * @since 1.1
+	 */
+	interface StatementFilterSpec<S extends StatementFilterSpec<S>> {
+
+		/**
+		 * Add the given filter to the end of the filter chain.
+		 *
+		 * @param filter the filter to be added to the chain.
+		 */
+		default S filter(Function<? super Statement, ? extends Statement> filter) {
+
+			Assert.notNull(filter, "Statement FilterFunction must not be null!");
+
+			return filter((statement, next) -> next.execute(filter.apply(statement)));
+		}
+
+		/**
+		 * Add the given filter to the end of the filter chain.
+		 *
+		 * @param filter the filter to be added to the chain.
+		 */
+		S filter(StatementFilterFunction filter);
 	}
 }
